@@ -5,7 +5,20 @@
         "*.tcc": "cpp"
     },
     "cSpell.words": [
+        "CGATT",
+        "CGCONTRDP",
+        "CGNSINF",
+        "CGNSPWR",
+        "CPIN",
+        "CPSI",
+        "CREG",
+        "GCAP",
+        "GNSS",
+        "IMEI",
+        "Jannik",
         "Jannled",
+        "NBIOT",
+        "netact",
         "Pico",
         "Schmöle",
         "Waveshare"
@@ -23,5 +36,6 @@
     ],
     "python.analysis.extraPaths": [
         "~/.micropico-stubs/included"
-    ]
+    ],
+    "cmake.ignoreCMakeListsMissing": true
 }
