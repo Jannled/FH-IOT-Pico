@@ -26,12 +26,14 @@ void sendATCommand(const char* command)
 	Serial.print(command);
 	Serial.print(": ");
 
+	int i = 0; 
 	String foo;
 	do {
 		String foo = Serial1.readString();
 		foo.trim();
+		i += 1;
 	}
-	while(foo.length() < 1);
+	while(foo.length() < 1 && i < 3);
 	
 	Serial.println(foo);
 }
