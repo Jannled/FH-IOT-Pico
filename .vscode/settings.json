@@ -21,6 +21,7 @@
         "netact",
         "Pico",
         "Schmöle",
+        "waveshare",
         "Waveshare"
     ],
     "python.languageServer": "Pylance",

@@ -23,35 +23,51 @@
 void sendATCommand(const char* command)
 {
 	Serial1.println(command);
-	String foo = Serial1.readString();
 	Serial.print(command);
 	Serial.print(": ");
+
+	int i = 0; 
+	String foo;
+	do {
+		String foo = Serial1.readString();
+		foo.trim();
+		i += 1;
+	}
+	while(foo.length() < 1 && i < 3);
+	
 	Serial.println(foo);
 }
 
-uint8_t send_at(const char* command, const char* expectedResult)
+int send_at(const char* command, const char* expectedResult)
 {
 	Serial1.println(command);
 	String foo = Serial1.readString();
 	foo.trim();
 
-	return foo.compareTo(expectedResult) == 0;
+	return foo.compareTo(expectedResult);
 }
 
 void waveshare_example()
 {
 	// Request Manufacturer Identification
 	sendATCommand("AT+GMI");
+	delay(100);
 
 	// Request TA Serial Number Identification (IMEI)
 	sendATCommand("AT+GSN");
+	delay(100);
 
 	sendATCommand("AT+CPIN?");
+	delay(100);
 
 	if(!send_at("AT+CPIN?", "READY"))
 		Serial.println("No SIM inserted");
+	delay(100);
 
+	/*
 	Serial.print("Connecting ");
+	sendATCommand("AT+CGATT?");
+	delay(100);
 	for(int i=0; i<10; i++)
 	{
 		if(!send_at("AT+CGATT?", "1"))
@@ -66,9 +82,24 @@ void waveshare_example()
 		}
 	}
 
+	sendATCommand("AT+CGATT?");
+	delay(100);
+
+	delay(2000);
+	Serial1.flush();
+
+	sendATCommand("AT+CGATT?");
+	delay(100);
+	*/
+
 	sendATCommand("AT+CSQ");
+	delay(500);
+
 	sendATCommand("AT+CPSI?");
+	delay(500);
+
     sendATCommand("AT+COPS?");
+	delay(500);
 }
 
 void my_stuff()
@@ -187,20 +218,25 @@ void my_stuff()
 
 void setup() 
 {
-	pinMode(PIN_MODEM_WAKE, OUTPUT);
+	//pinMode(PIN_MODEM_WAKE, OUTPUT);
 	pinMode(PIN_MODEM_SLEEP, OUTPUT);
 
 	Serial.begin(115200); // USB UART
 	Serial1.begin(115200); // SIM7080G-Cat-M module
-	Serial.setTimeout(5000);
+	Serial.setTimeout(1000);
+	Serial1.setTimeout(1000);
 
 	// Wake up Modem
 	delay(500);
+	digitalWrite(PIN_MODEM_SLEEP, LOW);
+	delay(2000);
 	digitalWrite(PIN_MODEM_SLEEP, HIGH);
-	digitalWrite(PIN_MODEM_WAKE, LOW);
+	//digitalWrite(PIN_MODEM_WAKE, LOW);
 
 	delay(6000);
 	Serial.println("Hello World");
+
+	sendATCommand("AT+IPR=115200");
 
 	// Prime the connection
 	Serial1.println("AT");
@@ -211,5 +247,7 @@ void setup()
 
 void loop() 
 {
-	
+	delay(5000);
+	Serial.println(Serial1.readString());
+	sendATCommand("AT+COPS?");
 }
