@@ -218,7 +218,7 @@ void my_stuff()
 
 void setup() 
 {
-	//pinMode(PIN_MODEM_WAKE, OUTPUT);
+	pinMode(PIN_MODEM_WAKE, OUTPUT);
 	pinMode(PIN_MODEM_SLEEP, OUTPUT);
 
 	Serial.begin(115200); // USB UART
@@ -227,16 +227,19 @@ void setup()
 	Serial1.setTimeout(1000);
 
 	// Wake up Modem
-	delay(500);
+	delay(0);
 	digitalWrite(PIN_MODEM_SLEEP, LOW);
-	delay(2000);
-	digitalWrite(PIN_MODEM_SLEEP, HIGH);
-	//digitalWrite(PIN_MODEM_WAKE, LOW);
+	Serial.println("Turning off Module");
+	delay(5000);
 
-	delay(6000);
+	Serial.println("Booting Module");
+	digitalWrite(PIN_MODEM_SLEEP, HIGH);
+	digitalWrite(PIN_MODEM_WAKE, LOW);
+
+	delay(5000);
 	Serial.println("Hello World");
 
-	sendATCommand("AT+IPR=115200");
+	//sendATCommand("AT+IPR=115200");
 
 	// Prime the connection
 	Serial1.println("AT");
@@ -247,7 +250,7 @@ void setup()
 
 void loop() 
 {
-	delay(5000);
+	delay(1000);
 	Serial.println(Serial1.readString());
 	sendATCommand("AT+COPS?");
 }
