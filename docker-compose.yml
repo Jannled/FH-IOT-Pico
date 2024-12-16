@@ -1,3 +1,5 @@
+name: iot-ws24
+
 # create your volumes here
 volumes: 
   influxdb-data:
@@ -116,19 +118,6 @@ configs:
         round_interval = true
         debug = true
         quiet = false
-
-      [[inputs.mqtt_consumer]]
-        servers = ["tcp://eu1.cloud.thethings.network:1883"]
-        topics = ['v3/projektmanagement@ttn/devices/#']
-        username = "projektmanagement@ttn"
-        password = "NNSXS.GSIIVQREQBVUR2ZDL3RUSG36FHYZKNEWY2XNBVA.B5QVRJNO5X5ZPGYWVXOKCKLH5WTL6XWQAQNBERSW7LJPFUNLRK4A"
-        data_format = "json"
-
-      [[outputs.influxdb_v2]]
-        urls = ["http://influx:8086"]
-        token = "nkPwFaNJ4ucGcMPNdezM5cGJMd1mryffEyPd1oFHv_vl4jFMD1KAoHLpScCd90878fv7tp25TPtphpSy-YvIjQ=="
-        organization = "fhydrate"
-        bucket = "trees"
 
       [[outputs.file]]
         files = ["stdout"]
