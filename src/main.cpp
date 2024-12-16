@@ -5,12 +5,14 @@
  * @version 0.1
  * @date 2024-10-11
  * 
- * 
- * 
  * @copyright MIT License
  */
 
 #include <Arduino.h>
+
+#define NBIOT
+
+#define SERIAL_MODEM Serial1
 
 // Pull down to wake Modem during sleep
 #define PIN_MODEM_WAKE 17
@@ -18,143 +20,75 @@
 // Pull down to cut modem power
 #define PIN_MODEM_SLEEP 14
 
-#define NBIOT
+#define CRLF "\r\n"
 
 void sendATCommand(const char* command)
 {
-	Serial1.println(command);
+	SERIAL_MODEM.println(command);
+	String foo = SERIAL_MODEM.readStringUntil('\n');
 	Serial.print(command);
 	Serial.print(": ");
-
-	int i = 0; 
-	String foo;
-	do {
-		String foo = Serial1.readString();
-		foo.trim();
-		i += 1;
-	}
-	while(foo.length() < 1 && i < 3);
-	
+	foo.trim();
 	Serial.println(foo);
 }
 
 int send_at(const char* command, const char* expectedResult)
 {
-	Serial1.println(command);
-	String foo = Serial1.readString();
-	foo.trim();
+	SERIAL_MODEM.println(command);
+	String foo;
+	for(int i=0; i<10; i++)
+	{
+		foo = SERIAL_MODEM.readString();
+		foo.trim();
 
+		if(foo.length() > 0)
+			break;
+	}
+
+	Serial.println("---");
+	Serial.print("FOO: ");
+	Serial.println(foo);
+	Serial.println("---");
 	return foo.compareTo(expectedResult);
 }
 
-void waveshare_example()
+void setup() 
 {
-	// Request Manufacturer Identification
-	sendATCommand("AT+GMI");
-	delay(100);
+	pinMode(PIN_MODEM_WAKE, OUTPUT);
+	pinMode(PIN_MODEM_SLEEP, OUTPUT);
 
-	// Request TA Serial Number Identification (IMEI)
-	sendATCommand("AT+GSN");
-	delay(100);
-
-	sendATCommand("AT+CPIN?");
-	delay(100);
-
-	if(!send_at("AT+CPIN?", "READY"))
-		Serial.println("No SIM inserted");
-	delay(100);
-
-	/*
-	Serial.print("Connecting ");
-	sendATCommand("AT+CGATT?");
-	delay(100);
-	for(int i=0; i<10; i++)
-	{
-		if(!send_at("AT+CGATT?", "1"))
-		{
-			Serial.print(".");
-			delay(500);
-		}
-		else
-		{
-			Serial.println("Connected");
-			break;
-		}
-	}
-
-	sendATCommand("AT+CGATT?");
-	delay(100);
+	Serial.begin(115200); // USB UART
+	SERIAL_MODEM.begin(115200); // SIM7080G-Cat-M module
 
 	delay(2000);
-	Serial1.flush();
+	Serial.println("Hello World");
 
-	sendATCommand("AT+CGATT?");
-	delay(100);
-	*/
+	// Wake up Modem
+	delay(6000);
+	digitalWrite(PIN_MODEM_SLEEP, HIGH);
+	digitalWrite(PIN_MODEM_WAKE, LOW);
 
-	sendATCommand("AT+CSQ");
-	delay(500);
-
-	sendATCommand("AT+CPSI?");
-	delay(500);
-
-    sendATCommand("AT+COPS?");
-	delay(500);
-}
-
-void my_stuff()
-{
 	Serial.println("AT");
 	Serial.setTimeout(5000);
 
 	for(int i=0; i<5; i++)
 	{
-		Serial1.println("AT");
-		String foo = Serial1.readStringUntil('\n');
+		SERIAL_MODEM.println("AT");
+		String foo = SERIAL_MODEM.readStringUntil('\n');
 		Serial.println(foo);
 	}
 
-	Serial1.readString();
+	SERIAL_MODEM.readString();
+
+	Serial.printf("Response: %d" CRLF, send_at("AT", "AT\r\r\nOK"));
 
 	sendATCommand("ATI");
 	
 	#ifdef NBIOT
-
-	// Request Manufacturer Identification
 	sendATCommand("AT+GMI");
-
-	// Request TA Serial Number Identification (IMEI)
 	sendATCommand("AT+GSN");
-
-	// Request Complete TA Capabilities List
-	sendATCommand("AT+GCAP");
-
-	// Enter PIN
 	sendATCommand("AT+CPIN?");
-
-	// Operator Selection
-	sendATCommand("AT+COPS?");
-
-	// Network Registration
-	sendATCommand("AT+CREG?");
-	// +CREG: <n>,<stat>[,<lac>,<ci>,<netact>]
-	// stat: 
-	//   1 Registered, home network
-	//   2 Not registered, but MT is currently searching a new operator to register to
-	//   3 Registration denied
-	//   4 Unknown
-	//   5 Registered, roaming
-
-	// Attach or detach from GPRS service
-	sendATCommand("AT+CGATT?");
-
-	// GNSS Power Control
-	sendATCommand("AT+CGNSPWR?");
-
-	// 
-	sendATCommand("AT+CGCONTRDP");
-	
-	//CSOC
+	sendATCommand("AT+CIFSR");
 
 	for(int i=0; i<10; i++)
 	{
@@ -216,41 +150,7 @@ void my_stuff()
 	}*/
 }
 
-void setup() 
-{
-	pinMode(PIN_MODEM_WAKE, OUTPUT);
-	pinMode(PIN_MODEM_SLEEP, OUTPUT);
-
-	Serial.begin(115200); // USB UART
-	Serial1.begin(115200); // SIM7080G-Cat-M module
-	Serial.setTimeout(1000);
-	Serial1.setTimeout(1000);
-
-	// Wake up Modem
-	delay(0);
-	digitalWrite(PIN_MODEM_SLEEP, LOW);
-	Serial.println("Turning off Module");
-	delay(5000);
-
-	Serial.println("Booting Module");
-	digitalWrite(PIN_MODEM_SLEEP, HIGH);
-	digitalWrite(PIN_MODEM_WAKE, LOW);
-
-	delay(5000);
-	Serial.println("Hello World");
-
-	//sendATCommand("AT+IPR=115200");
-
-	// Prime the connection
-	Serial1.println("AT");
-	Serial1.readString();
-
-	waveshare_example();
-}
-
 void loop() 
 {
-	delay(1000);
-	Serial.println(Serial1.readString());
-	sendATCommand("AT+COPS?");
+	
 }

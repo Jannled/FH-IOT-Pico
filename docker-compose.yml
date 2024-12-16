@@ -1,0 +1,141 @@
+# create your volumes here
+volumes: 
+  influxdb-data:
+    name: "ws24_influxdb"
+    external: true
+  grafana_storage: 
+    name: "ws24_grafana"
+    external: true
+  influxdb-config:
+
+
+# SERVICES
+services:
+  # Automatic container updates
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtowerr
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --stop-timeout 60s --schedule "0 0 4 * * *" --cleanup=true
+
+  # Telegraf
+  telegraf:
+    image: docker.io/telegraf:alpine
+    container_name: telegraf
+    restart: unless-stopped
+    environment:
+      INFLUX_URL: influxdb:8086
+      USER: /run/secrets/influxdb-admin-username
+      INFLUX_PASSWORD: /run/secrets/influxdb-admin-password
+      INFLUX_SKIP_DATABASE_CREATION: false
+      #FHYDRATE_PASSWORD: /run/secrets/fhydrate_password
+    secrets:
+      - influxdb-admin-username
+      - influxdb-admin-password
+      #- fhydrate_password
+    configs:
+      - source: telegraf.conf
+        target: /etc/telegraf/telegraf.conf
+    depends_on:
+      - influxdb
+    labels:
+      - com.centurylinklabs.watchtower.monitor-only="true"
+
+  # InfluxDB
+  influxdb:
+    image: influxdb:2
+    container_name: influx
+    restart: unless-stopped
+    ports:
+      - 8086:8086
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME_FILE: /run/secrets/influxdb-admin-username
+      DOCKER_INFLUXDB_INIT_PASSWORD_FILE: /run/secrets/influxdb-admin-password 
+      DOCKER_INFLUXDB_INIT_ORG: iot 
+      DOCKER_INFLUXDB_INIT_BUCKET: measurements
+    secrets:
+      - influxdb-admin-username
+      - influxdb-admin-password
+    volumes:
+      - type: volume
+        source: influxdb-data
+        target: /var/lib/influxdb
+      - type: volume
+        source: influxdb-config
+        target: /etc/influxdb
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    restart: unless-stopped
+    ports: 
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER__FILE=/run/secrets/influxdb-admin-username
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana-admin-password
+    secrets:
+      - influxdb-admin-username
+      - grafana-admin-password
+    volumes:
+      - 'grafana_storage:/var/lib/grafana'
+
+  mqtt:
+    image: eclipse-mosquitto
+    container_name: mqtt
+    restart: unless-stopped
+    ports:
+      - 1883:1883
+    configs:
+      - source: mosquitto.conf
+        target: /mosquitto/config/mosquitto.conf
+
+
+# All secrets
+secrets:
+  influxdb-admin-username:
+    file: ~/secrets/influxdb-admin-username
+  influxdb-admin-password:
+    file: ~/secrets/influxdb-admin-password
+  #fhydrate_password:
+  #  file: ~/secrets/ttn-mqtt-password
+  #telegraf-api-token:
+  #  file: ~/secrets/telegraf-api-token
+  grafana-admin-password:
+    file: ~/secrets/grafana-admin-password
+
+
+# Config Files
+configs:
+  telegraf.conf:
+    content: |
+      [agent]
+        interval = "10m"
+        round_interval = true
+        debug = true
+        quiet = false
+
+      [[inputs.mqtt_consumer]]
+        servers = ["tcp://eu1.cloud.thethings.network:1883"]
+        topics = ['v3/projektmanagement@ttn/devices/#']
+        username = "projektmanagement@ttn"
+        password = "NNSXS.GSIIVQREQBVUR2ZDL3RUSG36FHYZKNEWY2XNBVA.B5QVRJNO5X5ZPGYWVXOKCKLH5WTL6XWQAQNBERSW7LJPFUNLRK4A"
+        data_format = "json"
+
+      [[outputs.influxdb_v2]]
+        urls = ["http://influx:8086"]
+        token = "nkPwFaNJ4ucGcMPNdezM5cGJMd1mryffEyPd1oFHv_vl4jFMD1KAoHLpScCd90878fv7tp25TPtphpSy-YvIjQ=="
+        organization = "fhydrate"
+        bucket = "trees"
+
+      [[outputs.file]]
+        files = ["stdout"]
+        data_format = "json"
+        json_timestamp_units = "1s"
+
+  mosquitto.conf:
+    content: |
+      listener 1883
+      allow_anonymous true
