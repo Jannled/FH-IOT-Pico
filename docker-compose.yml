@@ -4,11 +4,11 @@ name: iot-ws24
 # docker volume create ws24_grafana
 
 # create your volumes here
-volumes: 
+volumes:
   influxdb-data:
     name: "ws24_influxdb"
     external: true
-  grafana_storage: 
+  grafana_storage:
     name: "ws24_grafana"
     external: true
   influxdb-config:
@@ -100,16 +100,19 @@ services:
     build:
       context: ./coap-server
       dockerfile: Dockerfile
+    ports:
+      - "5683:5683"
+      - "5683:5683/udp"
 
 
 # All secrets
 secrets:
   influxdb-admin-username:
-    file: secrets/influxdb-admin-username
+    file: ~/secrets/influxdb-admin-username
   influxdb-admin-password:
-    file: secrets/influxdb-admin-password
+    file: ~/secrets/influxdb-admin-password
   grafana-admin-password:
-    file: secrets/grafana-admin-password
+    file: ~/secrets/grafana-admin-password
 
 
 # Config Files

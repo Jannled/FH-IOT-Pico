@@ -14,4 +14,4 @@ EXPOSE 5683
 # EXPOSE 5684
 
 # Run the CoAP Server when the container launches
-CMD ["python", "--version"]
+CMD ["python", "-m", "coap-server"]
