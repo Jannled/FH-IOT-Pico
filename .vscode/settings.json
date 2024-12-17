@@ -5,11 +5,13 @@
         "*.tcc": "cpp"
     },
     "cSpell.words": [
+        "aiocoap",
         "centurylinklabs",
         "CGATT",
         "CGCONTRDP",
         "CGNSINF",
         "CGNSPWR",
+        "coap",
         "containrrr",
         "CPIN",
         "CPSI",
@@ -25,12 +27,15 @@
         "mqtt",
         "NBIOT",
         "netact",
+        "paho",
         "Pico",
         "Schmöle",
         "thethings",
+        "venv",
         "watchtowerr",
         "waveshare",
-        "Waveshare"
+        "Waveshare",
+        "WORKDIR"
     ],
     "python.languageServer": "Pylance",
     "python.analysis.typeCheckingMode": "basic",

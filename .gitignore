@@ -38,6 +38,9 @@
 .vscode/launch.json
 .vscode/ipch
 
+# Python virtual environments
+.venv
+
 # OS and other application specific stuff
 Thumbs.db
 .DS_Store
