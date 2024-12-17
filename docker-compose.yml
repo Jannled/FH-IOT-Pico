@@ -1,5 +1,8 @@
 name: iot-ws24
 
+# docker volume create ws24_influxdb
+# docker volume create ws24_grafana
+
 # create your volumes here
 volumes: 
   influxdb-data:
@@ -96,17 +99,17 @@ services:
     restart: unless-stopped
     build:
       context: ./coap-server
-      dockerfile: coap-server/Dockerfile
+      dockerfile: Dockerfile
 
 
 # All secrets
 secrets:
   influxdb-admin-username:
-    file: ~/secrets/influxdb-admin-username
+    file: secrets/influxdb-admin-username
   influxdb-admin-password:
-    file: ~/secrets/influxdb-admin-password
+    file: secrets/influxdb-admin-password
   grafana-admin-password:
-    file: ~/secrets/grafana-admin-password
+    file: secrets/grafana-admin-password
 
 
 # Config Files
@@ -118,6 +121,14 @@ configs:
         round_interval = true
         debug = true
         quiet = false
+
+      [[inputs.mqtt_consumer]]
+        servers = ["tcp://mqtt:1883"]
+        topics = [
+          "foo/#"
+        ]
+        data_format = "value"
+        topic_tag = "topic"
 
       [[outputs.file]]
         files = ["stdout"]
