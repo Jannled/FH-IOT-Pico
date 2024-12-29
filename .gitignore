@@ -38,8 +38,9 @@
 .vscode/launch.json
 .vscode/ipch
 
-# Python virtual environments
+# Python
 .venv
+__pycache__
 
 # OS and other application specific stuff
 Thumbs.db

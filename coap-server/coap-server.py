@@ -1,27 +1,46 @@
+from typing import Optional
+import argparse
+import asyncio
 import datetime
 import logging
 
-import asyncio
-
-import aiocoap.resource as resource
-from aiocoap.numbers.contentformat import ContentFormat
 import aiocoap
-from aiocoap import Message, Code
+import aiocoap.resource as resource
+import paho.mqtt.client as mqtt
+from aiocoap import Code, Message
+from aiocoap.numbers.contentformat import ContentFormat
+from paho.mqtt.enums import CallbackAPIVersion
+
+# logging setup
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("coap-server").setLevel(logging.DEBUG)
+
+# MQTT Singleton
+mqtt_client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
+
 
 class AllResourcesHandler(resource.Resource):
     async def render(self, request: Message):
-        # Log or process the request
-        print(f"Received request: {request.code} on {request.opt.uri_path}")
-        print(f"Payload: {request.payload.decode('utf-8')}")
-        
+        # Log or process the request        
         logging.info(f"Received request: {request.code} on {request.opt.uri_path}")
         logging.info(f"Payload: {request.payload.decode('utf-8')}")
+
+        # Publish to MQTT Broker
+        try:
+            topic = request.requested_path
+            mqtt_client.publish(
+                topic=topic, 
+                payload=request.payload.decode(encoding='utf-8')
+            )
+        except Exception as e:
+            logging.error(f'Failed to publish topic {topic}: "{e}"')
 
         # Respond with a generic message
         return Message(
             code=Code.CONTENT,
             payload=b"Generic response for any resource"
         )
+
 
 class Welcome(resource.Resource):
 
@@ -50,68 +69,18 @@ class Welcome(resource.Resource):
             return aiocoap.Message(payload=self.representations[cf], content_format=cf)
 
         except KeyError:
-            raise aiocoap.error.UnsupportedContentFormat
-
-
-
-class BlockResource(resource.Resource):
-    """Example resource which supports the GET and PUT methods. It sends large
-    responses, which trigger blockwise transfer."""
-
-    def __init__(self):
-        super().__init__()
-        self.set_content(
-            b"This is the resource's default content. It is padded "
-            b"with numbers to be large enough to trigger blockwise "
-            b"transfer.\n"
-        )
-
-
-    def set_content(self, content):
-        self.content = content
-        while len(self.content) <= 1024:
-            self.content = self.content + b"0123456789\n"
-
-    async def render_get(self, request):
-        return aiocoap.Message(payload=self.content)
-
-    async def render_put(self, request):
-        print("PUT payload: %s" % request.payload)
-        self.set_content(request.payload)
-        return aiocoap.Message(code=aiocoap.CHANGED, payload=self.content)
-
-
-class SeparateLargeResource(resource.Resource):
-    """Example resource which supports the GET method. It uses asyncio.sleep to
-    simulate a long-running operation, and thus forces the protocol to send
-    empty ACK first."""
-
-    def get_link_description(self):
-        # Publish additional data in .well-known/core
-        return dict(**super().get_link_description(), title="A large resource")
-
-    async def render_get(self, request):
-        await asyncio.sleep(3)
-
-        payload = (
-            "Three rings for the elven kings under the sky, seven rings "
-            "for dwarven lords in their halls of stone, nine rings for "
-            "mortal men doomed to die, one ring for the dark lord on his "
-            "dark throne.".encode("ascii")
-        )
-
-        return aiocoap.Message(payload=payload)
-
+            raise aiocoap.error.UnsupportedContentFormat # type: ignore
 
 
 class TimeResource(resource.ObservableResource):
     """Example resource that can be observed. The `notify` method keeps
-    scheduling itself, and calles `update_state` to trigger sending
+    scheduling itself, and calls `update_state` to trigger sending
     notifications."""
 
     def __init__(self):
         super().__init__()
         self.handle = None
+
 
     def notify(self):
         self.updated_state()
@@ -158,37 +127,71 @@ class WhoAmI(resource.Resource):
         return aiocoap.Message(content_format=0, payload="\n".join(text).encode("utf8"))
 
 
-# logging setup
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("coap-server").setLevel(logging.DEBUG)
+def connect_mqtt(
+        broker: str, port: int = 1833, 
+        keepalive: int = 60, 
+        username: Optional[str] = None, 
+        password: Optional[str] = None
+    ):
+    def onConnect(client, userdata, flags, rc):
+        if rc==0:
+            logging.info("Connected to MQTT Broker")
+        else:
+            logging.warning(f"Connection to MQTT failed with code {rc}")
 
-async def main():
+    def onDisconnect(client, userdata, reason_code, properties):
+        logging.warning(f"Lost connection to MQTT Server: {reason_code}")
 
-    print("Hello world")
-    logging.info("Hallol")
 
+    try:
+        mqtt_client.username_pw_set(username, password=password)
+        mqtt_client.connect(broker, port, keepalive)
+        mqtt_client.on_connect = onConnect
+        mqtt_client.on_disconnect = onDisconnect
+        mqtt_client.loop_start()
+    except ConnectionRefusedError as e:
+        logging.error(f'Connection to MQTT failed: "{e}"')
+    except Exception as e:
+        logging.error(f'Exception in MQTT lib: "{e}"')
+
+
+async def loop_coap():
     # Resource tree creation
     root = resource.Site()
     sensor = resource.Site()
+
 
     root.add_resource(
         [".well-known", "core"], resource.WKCResource(root.get_resources_as_linkheader)
     )
     root.add_resource([], Welcome())
     root.add_resource(["time"], TimeResource())
-    root.add_resource(["other", "block"], BlockResource())
-    root.add_resource(["other", "separate"], SeparateLargeResource())
     root.add_resource(["whoami"], WhoAmI())
-    #root.add_resource([''], AllResourcesHandler())
+    root.add_resource([''], AllResourcesHandler())
 
     root.add_resource(['sensor'], sensor)
     sensor.add_resource(['data'], AllResourcesHandler())
 
-    await aiocoap.Context.create_server_context(root, bind=('0.0.0.0', 5683))
+    # 5683 is the port for unencrypted coap
+    # 5684 is the port for DTLS coap
+    await aiocoap.Context.create_server_context(root, bind=('localhost', 5683))
 
     # Run forever
     await asyncio.get_running_loop().create_future()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try: 
+        parser = argparse.ArgumentParser(description="A CoAP server that relays messages to an MQTT Broker")
+        parser.add_argument("mqtt_server", help="The hostname/ip address of the MQTT broker the messages are forwarded to")
+        parser.add_argument("-u", "--username", default=None, help="Username for MQTT Broker")
+        parser.add_argument("-p", "--password", default=None, help="Password for MQTT Broker")
+
+        args = parser.parse_args()
+
+        connect_mqtt(args.mqtt_server, username=args.username, password=args.password)
+
+        asyncio.run(loop_coap())
+    
+    except KeyboardInterrupt: 
+        print("CoAP MQTT Bridge stopped")

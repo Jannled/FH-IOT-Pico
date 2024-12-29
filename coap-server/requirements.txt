@@ -1,2 +1,7 @@
 aiocoap
 paho-mqtt
+
+# Needed for --pretty-print
+cbor2
+pygments
+cbor-diag
