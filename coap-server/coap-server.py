@@ -11,6 +11,9 @@ from aiocoap import Code, Message
 from aiocoap.numbers.contentformat import ContentFormat
 from paho.mqtt.enums import CallbackAPIVersion
 
+from importlib.metadata import version
+from urllib.parse import urlparse
+
 # logging setup
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("coap-server").setLevel(logging.DEBUG)
@@ -19,15 +22,25 @@ logging.getLogger("coap-server").setLevel(logging.DEBUG)
 mqtt_client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
 
 
-class AllResourcesHandler(resource.Resource):
+class MQTT_Relay(resource.Resource):
     async def render(self, request: Message):
+        topic = "default"
+        try:
+            requestUri = urlparse(request.get_request_uri())
+            topic = str(requestUri.path).removeprefix('/')
+
+            # Drop some topics that seem unreasonable
+            if topic == None or len(topic) < 1 or topic in ['/', '()', '#', '$']:
+                topic = "default"
+        except:
+            logging.error("Unable to get request uri")
+
         # Log or process the request        
-        logging.info(f"Received request: {request.code} on {request.opt.uri_path}")
+        logging.info(f"Received request: {request.code} on {request.get_request_uri()}")
         logging.info(f"Payload: {request.payload.decode('utf-8')}")
 
         # Publish to MQTT Broker
-        try:
-            topic = request.requested_path
+        try:            
             mqtt_client.publish(
                 topic=topic, 
                 payload=request.payload.decode(encoding='utf-8')
@@ -161,16 +174,22 @@ async def loop_coap():
     sensor = resource.Site()
 
 
+    # .well.known/* resources
+    # CoRE protocol allows for automatic discovery of all endpoints
+    # this server provides
     root.add_resource(
         [".well-known", "core"], resource.WKCResource(root.get_resources_as_linkheader)
     )
+
+    # /* resources
     root.add_resource([], Welcome())
     root.add_resource(["time"], TimeResource())
     root.add_resource(["whoami"], WhoAmI())
-    root.add_resource([''], AllResourcesHandler())
+    #root.add_resource([''], MQTT_Relay())
 
+    # sensor/* resources
     root.add_resource(['sensor'], sensor)
-    sensor.add_resource(['data'], AllResourcesHandler())
+    sensor.add_resource(['data'], MQTT_Relay())
 
     # 5683 is the port for unencrypted coap
     # 5684 is the port for DTLS coap
@@ -188,6 +207,11 @@ if __name__ == "__main__":
         parser.add_argument("-p", "--password", default=None, help="Password for MQTT Broker")
 
         args = parser.parse_args()
+
+        print("---")
+        print(f"aiocoap Version: {version('aiocoap')}")
+        print(f"paho-mqtt Version: {version('paho-mqtt')}")
+        print("---")
 
         connect_mqtt(args.mqtt_server, username=args.username, password=args.password)
 
