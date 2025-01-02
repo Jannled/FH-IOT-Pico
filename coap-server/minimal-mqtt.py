@@ -1,9 +1,8 @@
-import os
-from typing import Optional
-import argparse
 import asyncio
 import datetime
 import logging
+import os
+from urllib.parse import urlparse
 
 import aiocoap
 import aiocoap.resource as resource
@@ -12,84 +11,50 @@ from aiocoap import Code, Message
 from aiocoap.numbers.contentformat import ContentFormat
 from paho.mqtt.enums import CallbackAPIVersion
 
-from importlib.metadata import version
-from urllib.parse import urlparse
-
-# logging setup
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("coap-server").setLevel(logging.DEBUG)
-
-
-class MQTT_Relay(resource.Resource):
-    # MQTT Singleton
-    mqtt_client = mqtt.Client(
-        #client_id="", userdata=None, protocol=mqtt.MQTTv5#,
-        #callback_api_version=CallbackAPIVersion.VERSION2
-    )
+# Set Log Level
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s %(name)s %(levelname)s]: %(message)s'
+)
+log = logging.getLogger('coap2mqtt')
 
 
-    @staticmethod
-    def onConnect(client, userdata, flags, rc):
-        if rc==0:
-            logging.info("Connected to MQTT Broker")
-        else:
-            logging.warning(f"Connection to MQTT failed with code {rc}")
-
-    @staticmethod
-    def onDisconnect(client, userdata, reason_code, properties):
-        logging.warning(f"Lost connection to MQTT Server: {reason_code}")
-
-    @staticmethod
-    def connect_mqtt(
-        broker: str, port: int = 1833, 
-        keepalive: int = 60, 
-        username: Optional[str] = None, 
-        password: Optional[str] = None
-    ):
-        logging.info(f'Connecting to MQTT Server: "{broker}"')
-
-        try:
-            MQTT_Relay.mqtt_client.username_pw_set(username, password=password)
-            MQTT_Relay.mqtt_client.connect(broker, port, keepalive)
-            MQTT_Relay.mqtt_client.on_connect = MQTT_Relay.onConnect
-            MQTT_Relay.mqtt_client.on_disconnect = MQTT_Relay.onDisconnect
-            MQTT_Relay.mqtt_client.loop_start()
-            MQTT_Relay.mqtt_client.subscribe("test/topic")
-        except ConnectionRefusedError as e:
-            logging.error(f'Connection to MQTT failed: "{e}"')
-        except Exception as e:
-            logging.error(f'Exception in MQTT lib: "{e}"')
+# Create an MQTT client instance
+client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
+DEFAULT_TOPIC = "sensor/default" # Fallback Topic
 
 
+class MQTT_Bridge(resource.Resource):
     async def render(self, request: Message):
-        topic = "default"
+        topic = DEFAULT_TOPIC
         try:
             requestUri = urlparse(request.get_request_uri())
             topic = str(requestUri.path).removeprefix('/')
 
             # Drop some topics that seem unreasonable
             if topic == None or len(topic) < 1 or topic in ['/', '()', '#', '$']:
-                topic = "default"
+                topic = DEFAULT_TOPIC
         except:
-            logging.error("Unable to get request uri")
+            log.error("Unable to get request uri")
 
         # Log or process the request        
-        logging.info(f"Received request: {request.code} on {request.get_request_uri()}")
-        logging.info(f"Payload: {request.payload.decode('utf-8')}")
+        log.info(f"Received request: {request.code} on {request.get_request_uri()}")
+        log.info(f"Payload: {request.payload.decode('utf-8')}")
 
         # Publish to MQTT Broker
         try:            
-            MQTT_Relay.mqtt_client.publish(
+            client.publish(
                 topic=topic, 
                 payload=request.payload.decode(encoding='utf-8')
             )
+            log.info(f"Published topic '{topic}'")
         except Exception as e:
-            logging.error(f'Failed to publish topic {topic}: "{e}"')
+            log.error(f'Failed to publish topic {topic}: "{e}"')
 
         # Respond with a generic message
         return Message(
             code=Code.CONTENT,
-            payload=b"Generic response for any resource"
+            payload=f"Published {len(request.payload)} bytes".encode()
         )
 
 
@@ -144,11 +109,11 @@ class TimeResource(resource.ObservableResource):
 
     def update_observation_count(self, count):
         if count and self.handle is None:
-            print("Starting the clock")
+            log.info("Starting the clock")
             self.reschedule()
 
         if count == 0 and self.handle:
-            print("Stopping the clock")
+            log.info("Stopping the clock")
             self.handle.cancel()
             self.handle = None
 
@@ -178,11 +143,21 @@ class WhoAmI(resource.Resource):
         return aiocoap.Message(content_format=0, payload="\n".join(text).encode("utf8"))
 
 
+def on_message(client2, userdata, msg):
+    log.info(f"Received message: {msg.payload.decode()} on topic {msg.topic}")
+    client.publish("motis/echo", msg.payload.decode())
+
+
+def on_connect(client, userdata, flags, rc, properties):
+    if rc == 0:
+        log.info("Connected successfully!")
+    else:
+        log.error(f"Connection failed with code {rc}")
+
 async def loop_coap():
     # Resource tree creation
     root = resource.Site()
     sensor = resource.Site()
-
 
     # .well.known/* resources
     # CoRE protocol allows for automatic discovery of all endpoints
@@ -195,42 +170,43 @@ async def loop_coap():
     root.add_resource([], Welcome())
     root.add_resource(["time"], TimeResource())
     root.add_resource(["whoami"], WhoAmI())
-    #root.add_resource([''], MQTT_Relay())
 
     # sensor/* resources
     root.add_resource(['sensor'], sensor)
-    sensor.add_resource(['data'], MQTT_Relay())
+    sensor.add_resource(['data'], MQTT_Bridge())
 
     # 5683 is the port for unencrypted coap
     # 5684 is the port for DTLS coap
-    await aiocoap.Context.create_server_context(root, bind=('localhost', 5683))
+    await aiocoap.Context.create_server_context(root, bind=('0.0.0.0', 5683))
 
     # Run forever
     await asyncio.get_running_loop().create_future()
 
 
 if __name__ == "__main__":
-    try: 
-        parser = argparse.ArgumentParser(description="A CoAP server that relays messages to an MQTT Broker")
+    client.on_connect = on_connect
+    client.on_message = on_message
 
-        args = parser.parse_args()
+    broker_addr = os.environ.get("MQTT_SERVER", "mqtt")
+    broker_port = int(os.environ.get("MQTT_PORT", 1883))
+    log.info(f'Connecting to "mqtt://{broker_addr}:{broker_port}" ...')
 
-        logging.info("---")
-        logging.info(f"aiocoap Version: {version('aiocoap')}")
-        logging.info(f"paho-mqtt Version: {version('paho-mqtt')}")
-        logging.info("---")
+    try:
+        client.username_pw_set(
+            username=os.environ.get("MQTT_USER", None), 
+            password=os.environ.get("MQTT_PASSWORD", None)
+        )
+        client.connect(
+            broker_addr,
+            port=broker_port,
+            keepalive=60
+        )
+    except ConnectionRefusedError as e:
+        log.error(f'Connection to MQTT failed: "{e}"')
+    except Exception as e:
+        log.error(f'Exception in MQTT lib: "{e}"')
 
-        try: 
-            MQTT_Relay.connect_mqtt(
-                os.environ.get("MQTT_SERVER", "mqtt")#,
-                #username=os.environ.get("MQTT_USER", None),
-                #password=os.environ.get("MQTT_PASSWORD", None)
-            )
-        except Exception as e:
-            logging.exception(f"Can't connect to MQTT: \"{e}\"")
-            
 
-        asyncio.run(loop_coap())
-    
-    except KeyboardInterrupt: 
-        print("CoAP MQTT Bridge stopped")
+    # Start CoAP Server & MQTT Client
+    client.loop_start()
+    asyncio.run(loop_coap())

@@ -1,0 +1,19 @@
+# Python
+.venv
+__pycache__
+
+# OS and other application specific stuff
+Thumbs.db
+.DS_Store
+._*
+*.bak
+
+# Docker stuff
+Dockerfile
+docker-compose.yml
+
+# Secrets
+secrets
+influxdb-admin-username
+influxdb-admin-password
+grafana-admin-password

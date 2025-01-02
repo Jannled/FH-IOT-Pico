@@ -13,4 +13,7 @@ echo \
 sudo apt-get update
 
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Allows current user to use Docker without super user privilegues.
+# You need to log out for this changes to take effect!
 sudo adduser $USER docker

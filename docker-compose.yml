@@ -23,6 +23,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --stop-timeout 60s --schedule "0 0 4 * * *" --cleanup=true
+    profiles: [tig]
 
   # Telegraf
   telegraf:
@@ -45,6 +46,7 @@ services:
       - influxdb
     labels:
       - com.centurylinklabs.watchtower.monitor-only="true"
+    profiles: [tig]
 
   # InfluxDB
   influxdb:
@@ -68,6 +70,7 @@ services:
       - type: volume
         source: influxdb-config
         target: /etc/influxdb
+    profiles: [tig]
 
   # Grafana
   grafana:
@@ -83,6 +86,7 @@ services:
       - grafana-admin-password
     volumes:
       - 'grafana_storage:/var/lib/grafana'
+    profiles: [tig]
 
   # MQTT
   mqtt:
@@ -100,9 +104,13 @@ services:
     build:
       context: ./coap-server
       dockerfile: Dockerfile
+    environment: 
+      - MQTT_SERVER=mqtt
     ports:
       - "5683:5683"
       - "5683:5683/udp"
+    depends_on:
+      - mqtt
 
 
 # All secrets
