@@ -81,76 +81,30 @@ void setup()
 	SERIAL_MODEM.readString();
 
 	Serial.printf("Response: %d" CRLF, send_at("AT", "AT\r\r\nOK"));
+	delay(1000);
 
 	sendATCommand("ATI");
-	
-	#ifdef NBIOT
+	delay(1000);	
 	sendATCommand("AT+GMI");
+	delay(1000);
 	sendATCommand("AT+GSN");
+	delay(1000);
 	sendATCommand("AT+CPIN?");
-	sendATCommand("AT+CIFSR");
-
-	for(int i=0; i<10; i++)
-	{
-		sendATCommand("AT+CSQ");
-		delay(1000);
-
-		sendATCommand("AT");
-		delay(1000);
-	}
-	#else
-	sendATCommand("AT+CGNSPWR=1");
-
-	delay(500);
-
-	sendATCommand("AT+CGNSPWR=1");
-
-	for(int i=0; i<100; i++)
-	{
-		sendATCommand("AT");
-		delay(1000);
-
-		sendATCommand("AT+CGNSINF");
-		delay(1000);
-	}
-	#endif
-
-
-	/*for(int i=0; i<2; i++)
-	{
-		Serial1.println("ATI");
-		for(int j=0; j<3; j++)
-		{
-			String foo = Serial1.readStringUntil('\n');
-			Serial.println(foo);
-		}
-		delay(100);
-	}
-
-	for(int i=0; i<5; i++)
-	{
-		Serial1.println("AT+GMI");
-		for(int j=0; j<3; j++)
-		{
-			String foo = Serial1.readStringUntil('\n');
-			Serial.println(foo);
-		}
-		delay(2000);
-	}
-
-	for(int i=0; i<5; i++)
-	{
-		Serial1.println("AT+GSN");
-		for(int j=0; j<3; j++)
-		{
-			String foo = Serial1.readStringUntil('\n');
-			Serial.println(foo);
-		}
-		delay(2000);
-	}*/
+	delay(1000);
 }
+
+unsigned long lastPublish = millis();
 
 void loop() 
 {
-	
+	while(SERIAL_MODEM.available())
+		Serial.write((uint8_t) SERIAL_MODEM.read());
+
+	const unsigned long now = millis();
+	if (now - lastPublish > 1000)
+	{
+		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CSQ");
+		SERIAL_MODEM.println("AT+CSQ");
+		lastPublish = now;
+	}
 }
