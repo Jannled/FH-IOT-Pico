@@ -125,7 +125,7 @@ void loop()
 	if (now - lastPublish > 2000)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
-		modem.sendAT("AT+CPSI?");
+		modem.sendAT("AT+CENG?"); // AT+CENG for 7020E
 		lastPublish = now;
 	}
 
