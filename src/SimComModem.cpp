@@ -14,7 +14,7 @@ void SimComModem::init(unsigned long baudRate)
 	digitalWrite(PIN_MODEM_WAKE, LOW);
 
     SERIAL_MODEM.begin(baudRate); // SIM7080G-Cat-M module
-    SERIAL_MODEM.setTimeout(1500);
+    SERIAL_MODEM.setTimeout(5000);
 }
 
 void SimComModem::powerOnSequence()

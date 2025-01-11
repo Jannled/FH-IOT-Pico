@@ -128,7 +128,7 @@ void loop()
 	if (now - lastPublish > 2500)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
-		modem.sendAT("AT+CPSI?");
+		SERIAL_MODEM.println("AT+CPSI?");
 		lastPublish = now;
 	}
 
