@@ -31,6 +31,7 @@ class SimComModem
     size_t write(uint8_t data);
     int read();
     arduino::String readStringUntil(char terminator);
+    arduino::String readLine();
 
     private:
 };

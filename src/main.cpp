@@ -111,6 +111,7 @@ void setup()
 	sendATCommand("AT+CSCLK?");
 
 	delay(500);
+
 }
 
 unsigned long lastPublish = millis();
@@ -118,6 +119,10 @@ unsigned long lastI2C = millis();
 
 void loop() 
 {
+	// Make sure all data from Modem is printed
+	while(modem.available())
+		Serial.write((uint8_t) modem.read());
+
 	// Ask about RSSI and SNR
 	const unsigned long now = millis();
 	if (now - lastPublish > 2500)
@@ -152,8 +157,4 @@ void loop()
 		lastI2C = now;
 	}
 	#endif
-
-	// Make sure all data from Modem is printed
-	while(modem.available())
-		Serial.write((uint8_t) modem.read());
 }

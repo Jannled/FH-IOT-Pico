@@ -14,11 +14,12 @@ void SimComModem::init(unsigned long baudRate)
 	digitalWrite(PIN_MODEM_WAKE, LOW);
 
     SERIAL_MODEM.begin(baudRate); // SIM7080G-Cat-M module
+    SERIAL_MODEM.setTimeout(1500);
 }
 
 void SimComModem::powerOnSequence()
 {
-    const unsigned long timeout = SERIAL_MODEM.getTimeout();
+    const unsigned long oldTimeout = SERIAL_MODEM.getTimeout();
     SERIAL_MODEM.setTimeout(500);
 
     // Power on State is only possible with DTR and PWR on LOW
@@ -29,6 +30,9 @@ void SimComModem::powerOnSequence()
     // If we receive a response we don't have to do anything
     SERIAL_MODEM.println("AT");
     String response = SERIAL_MODEM.readStringUntil('\r');
+
+    // Restore Timeout
+    SERIAL_MODEM.setTimeout(oldTimeout);
     if(response.length() > 0)
         return;
 
@@ -78,4 +82,11 @@ int SimComModem::read()
 arduino::String SimComModem::readStringUntil(char terminator)
 {
     return SERIAL_MODEM.readStringUntil(terminator);
+}
+
+arduino::String SimComModem::readLine()
+{
+    String foo = SERIAL_MODEM.readStringUntil('\n');
+	foo.trim();
+    return foo;
 }
