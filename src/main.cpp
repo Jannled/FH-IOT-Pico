@@ -73,6 +73,8 @@ void sendATCommand(const char* command)
 void setup() 
 {
 	modem.init(115200);
+	modem.powerOnSequence();
+
 	Serial.begin(115200); // USB UART
 	
 	// Init Temperature/Humidity Sensor
@@ -116,13 +118,9 @@ unsigned long lastI2C = millis();
 
 void loop() 
 {
-	// Make sure all data from Modem is printed
-	while(modem.available())
-		Serial.write((uint8_t) modem.read());
-
 	// Ask about RSSI and SNR
 	const unsigned long now = millis();
-	if (now - lastPublish > 2000)
+	if (now - lastPublish > 2500)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
 		modem.sendAT("AT+CPSI?");
@@ -154,4 +152,8 @@ void loop()
 		lastI2C = now;
 	}
 	#endif
+
+	// Make sure all data from Modem is printed
+	while(modem.available())
+		Serial.write((uint8_t) modem.read());
 }

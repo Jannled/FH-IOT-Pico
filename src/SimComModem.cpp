@@ -16,6 +16,28 @@ void SimComModem::init(unsigned long baudRate)
     SERIAL_MODEM.begin(baudRate); // SIM7080G-Cat-M module
 }
 
+void SimComModem::powerOnSequence()
+{
+    const unsigned long timeout = SERIAL_MODEM.getTimeout();
+    SERIAL_MODEM.setTimeout(500);
+
+    // Power on State is only possible with DTR and PWR on LOW
+    digitalWrite(PIN_MODEM_SLEEP, LOW);
+	digitalWrite(PIN_MODEM_WAKE, LOW);
+
+    // Write AT Command to check if modem is already on.
+    // If we receive a response we don't have to do anything
+    SERIAL_MODEM.println("AT");
+    String response = SERIAL_MODEM.readStringUntil('\r');
+    if(response.length() > 0)
+        return;
+
+    // Wake up Modem
+	digitalWrite(PIN_MODEM_SLEEP, HIGH);
+    delay(1200);
+    digitalWrite(PIN_MODEM_SLEEP, LOW);
+}
+
 void SimComModem::sendAT(const char* command)
 {
     // Pull down DTR to wake up modem if in Sleep
@@ -35,7 +57,7 @@ void SimComModem::wakeup()
 
 void SimComModem::sleep()
 {
-    digitalWrite(PIN_MODEM_WAKE, HIGH);
+    //digitalWrite(PIN_MODEM_WAKE, HIGH);
 }
 
 int SimComModem::available()
