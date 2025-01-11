@@ -11,24 +11,15 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+#include "SimComModem.hpp"
+
+#ifdef ENABLE_COAP
 // Documentation: https://github.com/finitespace/BME280
 #include <BME280.h>
 #include <BME280I2C.h>
 
 // Documentation: https://github.com/hideakitai/MsgPack
 #include <MsgPack.h>
-
-#define NBIOT
-
-#define SERIAL_MODEM Serial1
-
-// Pull down to wake Modem during sleep
-#define PIN_MODEM_WAKE 17
-
-// Pull down to cut modem power
-#define PIN_MODEM_SLEEP 14
-
-#define CRLF "\r\n"
 
 // TODO implement IMEI parsing
 const uint32_t deviceID = 42;
@@ -61,10 +52,13 @@ struct SensorMessage {
 	);
 };
 
-
 // MessagePack transport format
 MsgPack::Packer packer;
 SensorMessage sensorMessage;
+#endif // ENABLE_COAP
+
+
+SimComModem modem;
 
 void sendATCommand(const char* command)
 {
@@ -76,47 +70,21 @@ void sendATCommand(const char* command)
 	Serial.println(foo);
 }
 
-int send_at(const char* command, const char* expectedResult)
-{
-	SERIAL_MODEM.println(command);
-	String foo;
-	for(int i=0; i<10; i++)
-	{
-		foo = SERIAL_MODEM.readString();
-		foo.trim();
-
-		if(foo.length() > 0)
-			break;
-	}
-
-	Serial.println("---");
-	Serial.print("FOO: ");
-	Serial.println(foo);
-	Serial.println("---");
-	return foo.compareTo(expectedResult);
-}
-
 void setup() 
 {
-	pinMode(PIN_MODEM_WAKE, OUTPUT);
-	pinMode(PIN_MODEM_SLEEP, OUTPUT);
-
+	modem.init(115200);
 	Serial.begin(115200); // USB UART
-	SERIAL_MODEM.begin(115200); // SIM7080G-Cat-M module
-
+	
 	// Init Temperature/Humidity Sensor
 	Wire.begin();
+	#ifdef ENABLE_COAP
 	sensor.begin();
+	#endif
+
+	modem.wakeup();
 
 	delay(2000);
-	Serial.println("Starting Modem...");
-
-	// Wake up Modem
-	digitalWrite(PIN_MODEM_SLEEP, HIGH);
-	digitalWrite(PIN_MODEM_WAKE, LOW);
-
-	Serial.println("AT");
-	Serial.setTimeout(5000);
+	modem.wakeup();
 
 	for(int i=0; i<5; i++)
 	{
@@ -126,15 +94,21 @@ void setup()
 	}
 
 	SERIAL_MODEM.readString();
+	//modem.sleep();
 
 	sendATCommand("ATI");
-	delay(1000);	
+	delay(500);	
 	sendATCommand("AT+GMI");
-	delay(1000);
+	delay(500);
 	sendATCommand("AT+GSN");
-	delay(1000);
+	delay(500);
 	sendATCommand("AT+CPIN?");
-	delay(1000);
+	delay(500);
+	sendATCommand("AT+CFUN?");
+	delay(500);
+	sendATCommand("AT+CSCLK?");
+
+	delay(500);
 }
 
 unsigned long lastPublish = millis();
@@ -142,17 +116,21 @@ unsigned long lastI2C = millis();
 
 void loop() 
 {
-	while(SERIAL_MODEM.available())
-		Serial.write((uint8_t) SERIAL_MODEM.read());
+	// Make sure all data from Modem is printed
+	while(modem.available())
+		Serial.write((uint8_t) modem.read());
 
+	// Ask about RSSI and SNR
 	const unsigned long now = millis();
-	if (now - lastPublish > 1000)
+	if (now - lastPublish > 2000)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
-		SERIAL_MODEM.println("AT+CPSI?");
+		modem.sendAT("AT+CPSI?");
 		lastPublish = now;
 	}
 
+	// Trigger measurement and send packet
+	#ifdef ENABLE_COAP
 	if(now - lastI2C > 5000)
 	{
 		float temperature(NAN), humidity(NAN), pressure(NAN);
@@ -175,4 +153,5 @@ void loop()
 
 		lastI2C = now;
 	}
+	#endif
 }
