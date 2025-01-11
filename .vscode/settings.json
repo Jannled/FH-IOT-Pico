@@ -5,6 +5,8 @@
         "*.tcc": "cpp"
     },
     "cSpell.words": [
+        "adafruit",
+        "Adafruit",
         "aiocoap",
         "arduino",
         "blockwise",
@@ -26,9 +28,11 @@
         "dylib",
         "elven",
         "fhydrate",
+        "finitespace",
         "GCAP",
         "GNSS",
         "grafana",
+        "hideakitai",
         "hostinfo",
         "IMEI",
         "ipch",
@@ -47,6 +51,7 @@
         "pycache",
         "pygments",
         "rpipico",
+        "rssi",
         "Schmöle",
         "smod",
         "thethings",

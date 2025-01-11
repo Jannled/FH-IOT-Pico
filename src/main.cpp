@@ -9,6 +9,14 @@
  */
 
 #include <Arduino.h>
+#include <Wire.h>
+
+// Documentation: https://github.com/finitespace/BME280
+#include <BME280.h>
+#include <BME280I2C.h>
+
+// Documentation: https://github.com/hideakitai/MsgPack
+#include <MsgPack.h>
 
 #define NBIOT
 
@@ -21,6 +29,42 @@
 #define PIN_MODEM_SLEEP 14
 
 #define CRLF "\r\n"
+
+// TODO implement IMEI parsing
+const uint32_t deviceID = 42;
+
+// BME Sensor
+BME280I2C sensor;
+
+struct SensorMessage {
+	// The actual data
+	float temperature;
+	float humidity;
+	float pressure;
+	uint8_t rssi;
+	uint32_t senderID;
+
+	// Namen in Anlehnung an RFC 8428
+	MsgPack::str_t key_temp = "Cel";
+	MsgPack::str_t key_hum = "%RH";
+	MsgPack::str_t key_press = "Pa";
+	MsgPack::str_t key_id = "bn";
+	MsgPack::str_t key_rssi = "dB";
+
+	// Build the message
+	MSGPACK_DEFINE_MAP(
+		key_temp, temperature,
+		key_hum, humidity,
+		key_press, pressure,
+		key_rssi, rssi,
+		key_id, senderID
+	);
+};
+
+
+// MessagePack transport format
+MsgPack::Packer packer;
+SensorMessage sensorMessage;
 
 void sendATCommand(const char* command)
 {
@@ -60,11 +104,14 @@ void setup()
 	Serial.begin(115200); // USB UART
 	SERIAL_MODEM.begin(115200); // SIM7080G-Cat-M module
 
+	// Init Temperature/Humidity Sensor
+	Wire.begin();
+	sensor.begin();
+
 	delay(2000);
-	Serial.println("Hello World");
+	Serial.println("Starting Modem...");
 
 	// Wake up Modem
-	delay(6000);
 	digitalWrite(PIN_MODEM_SLEEP, HIGH);
 	digitalWrite(PIN_MODEM_WAKE, LOW);
 
@@ -80,9 +127,6 @@ void setup()
 
 	SERIAL_MODEM.readString();
 
-	Serial.printf("Response: %d" CRLF, send_at("AT", "AT\r\r\nOK"));
-	delay(1000);
-
 	sendATCommand("ATI");
 	delay(1000);	
 	sendATCommand("AT+GMI");
@@ -94,6 +138,7 @@ void setup()
 }
 
 unsigned long lastPublish = millis();
+unsigned long lastI2C = millis();
 
 void loop() 
 {
@@ -103,8 +148,31 @@ void loop()
 	const unsigned long now = millis();
 	if (now - lastPublish > 1000)
 	{
-		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CSQ");
-		SERIAL_MODEM.println("AT+CSQ");
+		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
+		SERIAL_MODEM.println("AT+CPSI?");
 		lastPublish = now;
+	}
+
+	if(now - lastI2C > 5000)
+	{
+		float temperature(NAN), humidity(NAN), pressure(NAN);
+		sensor.read(pressure, temperature, humidity);
+
+		Serial.printf("{\"temp\": %f, \"hum\": %f, \"press\": %f}\r\n", temperature, humidity, pressure);
+		//Serial.printf("%.2f°C \r\n", temperature);
+		
+		// Print MessagePack debug output
+		// Online Decoder: https://msgpack.solder.party/
+		sensorMessage.temperature = temperature;
+		sensorMessage.humidity = humidity;
+		sensorMessage.pressure = pressure;
+		sensorMessage.senderID = deviceID;
+		packer.serialize(sensorMessage);
+		for(size_t i=0; i<packer.size(); i++)
+			Serial.printf("%02X ", packer.data()[i]);
+		Serial.println();
+		packer.clear();
+
+		lastI2C = now;
 	}
 }
