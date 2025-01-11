@@ -73,6 +73,8 @@ void sendATCommand(const char* command)
 void setup() 
 {
 	modem.init(115200);
+	modem.powerOnSequence();
+
 	Serial.begin(115200); // USB UART
 	
 	// Init Temperature/Humidity Sensor
@@ -109,6 +111,7 @@ void setup()
 	sendATCommand("AT+CSCLK?");
 
 	delay(500);
+
 }
 
 unsigned long lastPublish = millis();
@@ -122,10 +125,10 @@ void loop()
 
 	// Ask about RSSI and SNR
 	const unsigned long now = millis();
-	if (now - lastPublish > 2000)
+	if (now - lastPublish > 2500)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
-		modem.sendAT("AT+CENG?"); // AT+CENG for 7020E
+		SERIAL_MODEM.println("AT+CENG?"); // AT+CENG for 7020E
 		lastPublish = now;
 	}
 
