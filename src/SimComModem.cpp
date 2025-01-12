@@ -66,11 +66,13 @@ void SimComModem::sendAT(const char* command)
 void SimComModem::echoAT(const char* command)
 {
 	SERIAL_MODEM.println(command);
-	String foo = SERIAL_MODEM.readStringUntil('\n');
-	Serial.print(command);
-	Serial.print(": ");
-	foo.trim();
-	Serial.println(foo);
+    unsigned long startTime = millis();
+    while((millis() - startTime) < timeout || available())
+    {
+        if(available())
+            Serial.write((uint8_t) read());
+    }
+    delay(100);
 }
 
 void SimComModem::wakeup()
@@ -95,15 +97,23 @@ void SimComModem::initCoAP()
 int SimComModem::sendPacket(const char* url, const char* path, const char* payload)
 {
     SERIAL_MODEM.printf("AT+CCOAPURL=\"coap://%s\"\r\n", url);
-    delay(100);
-    SERIAL_MODEM.printf(
-        "AT+CCOAPPARA=?\"CODE\",1,uri-path,0,\"%s\",uri-query,0,\"address=1\",payload,0,\"%s\"\r\n", 
-        path, payload
-    );
+    delay(500);
+    flush();
+    echoAT("AT+CCOAPPARA=\"CODE\",1,uri-path,0,\"sensor/data\",uri-query,0,\"address=1\",payload,0,\"hello world\"");
+    //SERIAL_MODEM.printf(
+    //    "AT+CCOAPPARA=\"CODE\",1,uri-path,0,\"%s\",uri-query,0,\"address=1\",payload,0,\"%s\"\r\n", 
+    //    path, payload
+    //);
     delay(100);
     sendAT("AT+CCOAPACTION");
 
     return 1;
+}
+
+void SimComModem::ping(const char* url)
+{
+    echoAT("AT+SNPDPID?");
+    SERIAL_MODEM.printf("AT+SNPING4=\"%s\",1,8,10000\r\n", url);
 }
 
 int SimComModem::available()
@@ -119,6 +129,19 @@ size_t SimComModem::write(uint8_t data)
 int SimComModem::read()
 {
     return SERIAL_MODEM.read();
+}
+
+unsigned int SimComModem::flush()
+{
+    unsigned int bytes = 0;
+    unsigned long startTime = millis();
+    while((millis() - startTime) < timeout || available())
+    {
+        if(available())
+            Serial.write((uint8_t) read());
+    }
+
+    return bytes;
 }
 
 arduino::String SimComModem::readStringUntil(char terminator)

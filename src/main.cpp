@@ -79,15 +79,17 @@ void setup()
 	modem.wakeup();
 
 	delay(2000);
-	modem.wakeup();
 
 	Serial.println("Waiting for Modem to come Online");
 	for(int i=0; i<10; i++)
 	{
-		Serial.print(".");
-		SERIAL_MODEM.println("AT");
-		String foo = SERIAL_MODEM.readStringUntil('\n');
-		Serial.println(foo);
+		//Serial.print("Modem is booting...");
+		modem.sendAT("AT");
+		String foo = modem.readStringUntil('\r');
+		if(foo.length() < 1)
+			Serial.print(".");
+		else
+			Serial.println(foo);
 	}
 	Serial.println();
 
@@ -95,28 +97,44 @@ void setup()
 	//modem.sleep();
 
 	modem.echoAT("ATI");
-	delay(500);	
 	modem.echoAT("AT+GMI");
-	delay(500);
 	modem.echoAT("AT+GSN");
-	delay(500);
 	modem.echoAT("AT+CPIN?");
-	delay(500);
 	modem.echoAT("AT+CFUN?");
-	delay(500);
 	modem.echoAT("AT+CSCLK?");
-	delay(500);
+
+	// Preferred Selection between CAT-M and NB-IoT
+	modem.echoAT("AT+CMNB=2");
+
+	modem.echoAT("AT+CEREG=1");
+	modem.echoAT("AT+CEREG?");
+
+	Serial.println("Asking for APN:");
+	modem.echoAT("AT+CGNAPN");
+	delay(100);
+
+	modem.echoAT("AT+CNCFG?");
+
+	Serial.println("Setting APN:");
+	modem.echoAT("AT+CNCFG=0,1,\"" APN "\"");
+
+	Serial.println("Checking if it worked:");
+	modem.echoAT("AT+CNCFG?");
+	
+	Serial.println("Ping:");
+	modem.ping(PING_URL);
 
 	// CoAP
-	delay(500);
+	modem.echoAT("AT+CCOAPACTION=4?");
+	modem.flush();
 	modem.initCoAP();
-	delay(500);
+	modem.flush();
 	modem.sendPacket(
 		COAP_URL, 
 		"sensor/data", 
 		"Foo"
 	);
-	delay(1000);
+	modem.flush();
 }
 
 unsigned long lastPublish = millis();
@@ -133,7 +151,7 @@ void loop()
 	if (now - lastPublish > 2500)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
-		modem.sendAT("AT+CPSI?");
+		modem.sendAT("AT+CENG?");
 		lastPublish = now;
 	}
 

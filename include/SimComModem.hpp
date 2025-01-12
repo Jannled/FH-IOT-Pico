@@ -31,12 +31,16 @@ class SimComModem
 
     void initCoAP();
     int sendPacket(const char* url, const char* path, const char* payload);
+    void ping(const char* url);
 
     int available();
     size_t write(uint8_t data);
     int read();
     arduino::String readStringUntil(char terminator);
     arduino::String readLine();
+    unsigned int flush();
+
+    unsigned long timeout = 1500;
 
     private:
 };
