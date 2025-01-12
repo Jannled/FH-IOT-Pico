@@ -31,6 +31,7 @@ class SimComModem
 
     void initCoAP();
     int sendPacket(const char* url, const char* path, const char* payload);
+    int sendPacket(const char* url, const char* path, const uint8_t* data, size_t len);
     void ping(const char* url);
 
     int available();

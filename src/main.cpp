@@ -25,7 +25,7 @@
 #include <MsgPack.h>
 
 // TODO implement IMEI parsing
-const uint32_t deviceID = 42;
+const uint32_t deviceID = 1337;
 
 // BME Sensor
 BME280I2C sensor;
@@ -81,6 +81,7 @@ void setup()
 	delay(2000);
 
 	Serial.println("Waiting for Modem to come Online");
+	modem.echoAT("AT+GMI");
 	for(int i=0; i<10; i++)
 	{
 		//Serial.print("Modem is booting...");
@@ -94,7 +95,6 @@ void setup()
 	Serial.println();
 
 	SERIAL_MODEM.readString();
-	//modem.sleep();
 
 	modem.echoAT("ATI");
 	modem.echoAT("AT+GMI");
@@ -107,33 +107,17 @@ void setup()
 	modem.echoAT("AT+CMNB=2");
 
 	modem.echoAT("AT+CEREG=1");
-	modem.echoAT("AT+CEREG?");
-
-	Serial.println("Asking for APN:");
 	modem.echoAT("AT+CGNAPN");
-	delay(100);
-
-	modem.echoAT("AT+CNCFG?");
 
 	Serial.println("Setting APN:");
 	modem.echoAT("AT+CNCFG=0,1,\"" APN "\"");
 
 	Serial.println("Checking if it worked:");
 	modem.echoAT("AT+CNCFG?");
-	
-	Serial.println("Ping:");
-	modem.ping(PING_URL);
 
-	// CoAP
-	modem.echoAT("AT+CCOAPACTION=4?");
+	// Init CoAP
 	modem.flush();
 	modem.initCoAP();
-	modem.flush();
-	modem.sendPacket(
-		COAP_URL, 
-		"sensor/data", 
-		"Foo"
-	);
 	modem.flush();
 }
 
@@ -157,24 +141,40 @@ void loop()
 
 	// Trigger measurement and send packet
 	#ifdef ENABLE_COAP
-	if(now - lastI2C > 5000)
+	if(now - lastI2C > 30000)
 	{
+		// Read BME280 Sensor
 		float temperature(NAN), humidity(NAN), pressure(NAN);
 		sensor.read(pressure, temperature, humidity);
 
-		Serial.printf("{\"temp\": %f, \"hum\": %f, \"press\": %f}\r\n", temperature, humidity, pressure);
-		//Serial.printf("%.2f°C \r\n", temperature);
+		// Build a JSON object
+		char buff[128] = {};
+		snprintf(
+			buff, sizeof(buff) - 1, 
+			"{\"temp\": %.2f, \"hum\": %.2f, \"press\": %.4f, \"bn\": %d}", 
+			temperature, humidity, pressure, deviceID
+		);
+		Serial.println(buff);
+
+		// Send JSON in plain text
+		modem.sendPacket(COAP_URL, "sensor/data", buff);
 		
-		// Print MessagePack debug output
-		// Online Decoder: https://msgpack.solder.party/
+		// Build MessagePack
 		sensorMessage.temperature = temperature;
 		sensorMessage.humidity = humidity;
 		sensorMessage.pressure = pressure;
 		sensorMessage.senderID = deviceID;
 		packer.serialize(sensorMessage);
+
+		// Print MessagePack debug output
+		// Online Decoder: https://msgpack.solder.party/
 		for(size_t i=0; i<packer.size(); i++)
 			Serial.printf("%02X ", packer.data()[i]);
 		Serial.println();
+
+		//modem.sendPacket(COAP_URL, "sensor/data", packer.data(), packer.size());
+
+		// Clear the store, otherwise the next packet will be concatenated
 		packer.clear();
 
 		lastI2C = now;

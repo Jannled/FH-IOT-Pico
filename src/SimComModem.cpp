@@ -96,14 +96,20 @@ void SimComModem::initCoAP()
 
 int SimComModem::sendPacket(const char* url, const char* path, const char* payload)
 {
+    return sendPacket(url, path, (uint8_t*) payload, strlen(payload));
+}
+
+int SimComModem::sendPacket(const char* url, const char* path, const uint8_t* data, size_t len)
+{
     SERIAL_MODEM.printf("AT+CCOAPURL=\"coap://%s\"\r\n", url);
     delay(500);
     flush();
-    echoAT("AT+CCOAPPARA=\"CODE\",1,uri-path,0,\"sensor/data\",uri-query,0,\"address=1\",payload,0,\"hello world\"");
-    //SERIAL_MODEM.printf(
-    //    "AT+CCOAPPARA=\"CODE\",1,uri-path,0,\"%s\",uri-query,0,\"address=1\",payload,0,\"%s\"\r\n", 
-    //    path, payload
-    //);
+
+    SERIAL_MODEM.printf("AT+CCOAPPARA=\"CODE\",1,uri-path,0,\"sensor/data\",uri-query,0,\"address=1\",payload,1,\"");
+    for(size_t i=0; i<len; i++)
+        SERIAL_MODEM.printf("%02X", data[i]);
+    SERIAL_MODEM.println("\"");
+
     delay(100);
     sendAT("AT+CCOAPACTION");
 
