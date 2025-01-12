@@ -53,3 +53,4 @@ secrets
 influxdb-admin-username
 influxdb-admin-password
 grafana-admin-password
+secrets.*

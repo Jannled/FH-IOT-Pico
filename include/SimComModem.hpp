@@ -8,10 +8,10 @@
 
 // Pull down to wake Modem during sleep
 // Connected to DTR Pin on Modem
-#define PIN_MODEM_WAKE 17
+#define PIN_MODEM_DTR 17
 
 // Pull down to cut modem power
-#define PIN_MODEM_SLEEP 14
+#define PIN_MODEM_PWRKEY 14
 
 #define CRLF "\r\n"
 
@@ -22,10 +22,15 @@ class SimComModem
 
     void init(unsigned long baudRate);
     void sendAT(const char* string);
+    void echoAT(const char* command);
 
     void powerOnSequence();
     void wakeup();
     void sleep();
+    void reboot();
+
+    void initCoAP();
+    int sendPacket(const char* url, const char* path, const char* payload);
 
     int available();
     size_t write(uint8_t data);

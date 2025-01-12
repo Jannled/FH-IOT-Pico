@@ -1,4 +1,26 @@
 {
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
+    },
+    "python.terminal.activateEnvironment": false,
+    "micropico.syncFolder": "",
+    "micropico.openOnStart": true,
+    "python.analysis.typeshedPaths": [
+        "~/.micropico-stubs/included"
+    ],
+    "python.analysis.extraPaths": [
+        "~/.micropico-stubs/included"
+    ],
+    "cmake.ignoreCMakeListsMissing": true,
+
+    "editor.rulers": [90, 120], // 90ish for Python, see: https://www.youtube.com/watch?v=wf-BqAjZb8M&t=260s
+
+	"[git-commit]": {
+		"editor.rulers": [50]
+	},
+
     "files.associations": {
         "*.toml": "ini",
         "at.h": "c",
@@ -21,6 +43,10 @@
         "arduino",
         "blockwise",
         "cbor",
+        "CCOAPACTION",
+        "CCOAPINIT",
+        "CCOAPPARA",
+        "CCOAPURL",
         "centurylinklabs",
         "CFUN",
         "CGATT",
@@ -48,6 +74,7 @@
         "grafana",
         "hideakitai",
         "hostinfo",
+        "idial",
         "IMEI",
         "ipch",
         "Jannik",
@@ -62,6 +89,7 @@
         "paho",
         "pico",
         "Pico",
+        "PWRKEY",
         "pycache",
         "pygments",
         "rpipico",
@@ -76,20 +104,5 @@
         "Waveshare",
         "WORKDIR"
     ],
-    "python.languageServer": "Pylance",
-    "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportMissingModuleSource": "none"
-    },
-    "python.terminal.activateEnvironment": false,
-    "micropico.syncFolder": "",
-    "micropico.openOnStart": true,
-    "python.analysis.typeshedPaths": [
-        "~/.micropico-stubs/included"
-    ],
-    "python.analysis.extraPaths": [
-        "~/.micropico-stubs/included"
-    ],
-    "cmake.ignoreCMakeListsMissing": true,
     "ros.distro": "jazzy"
 }

@@ -7,11 +7,11 @@ SimComModem::SimComModem()
 
 void SimComModem::init(unsigned long baudRate)
 {
-    pinMode(PIN_MODEM_WAKE, OUTPUT);
-	pinMode(PIN_MODEM_SLEEP, OUTPUT);
+    pinMode(PIN_MODEM_DTR, OUTPUT);
+	pinMode(PIN_MODEM_PWRKEY, OUTPUT);
 
-    digitalWrite(PIN_MODEM_SLEEP, LOW);
-	digitalWrite(PIN_MODEM_WAKE, LOW);
+    digitalWrite(PIN_MODEM_PWRKEY, LOW);
+	digitalWrite(PIN_MODEM_DTR, LOW);
 
     SERIAL_MODEM.begin(baudRate); // SIM7080G-Cat-M module
     SERIAL_MODEM.setTimeout(5000);
@@ -23,8 +23,8 @@ void SimComModem::powerOnSequence()
     SERIAL_MODEM.setTimeout(500);
 
     // Power on State is only possible with DTR and PWR on LOW
-    digitalWrite(PIN_MODEM_SLEEP, LOW);
-	digitalWrite(PIN_MODEM_WAKE, LOW);
+    digitalWrite(PIN_MODEM_PWRKEY, LOW);
+	digitalWrite(PIN_MODEM_DTR, LOW);
 
     // Write AT Command to check if modem is already on.
     // If we receive a response we don't have to do anything
@@ -34,34 +34,76 @@ void SimComModem::powerOnSequence()
     // Restore Timeout
     SERIAL_MODEM.setTimeout(oldTimeout);
     if(response.length() > 0)
+    {
+        //Serial.println("Reboot sequence");
+        //reboot();
         return;
+    }
 
     // Wake up Modem
-	digitalWrite(PIN_MODEM_SLEEP, HIGH);
+    Serial.println("Wakeup sequence");
+	digitalWrite(PIN_MODEM_PWRKEY, HIGH);
     delay(1200);
-    digitalWrite(PIN_MODEM_SLEEP, LOW);
+    digitalWrite(PIN_MODEM_PWRKEY, LOW);
+}
+
+void SimComModem::reboot()
+{
+    // Pulling PWRKEY to low for >12s will reboot the device
+    digitalWrite(PIN_MODEM_PWRKEY, HIGH);
+    delay(1400); 
+    digitalWrite(PIN_MODEM_PWRKEY, LOW);
+    digitalWrite(PIN_MODEM_DTR, LOW);
+    //sendAT("AT+CREBOOT");
 }
 
 void SimComModem::sendAT(const char* command)
 {
-    // Pull down DTR to wake up modem if in Sleep
     wakeup();
-
     SERIAL_MODEM.println(command);
+}
 
-    delay(10);
-    sleep();
+void SimComModem::echoAT(const char* command)
+{
+	SERIAL_MODEM.println(command);
+	String foo = SERIAL_MODEM.readStringUntil('\n');
+	Serial.print(command);
+	Serial.print(": ");
+	foo.trim();
+	Serial.println(foo);
 }
 
 void SimComModem::wakeup()
 {
-    digitalWrite(PIN_MODEM_WAKE, LOW);
-    delay(10);
+    digitalWrite(PIN_MODEM_DTR, LOW);
 }
 
 void SimComModem::sleep()
 {
-    //digitalWrite(PIN_MODEM_WAKE, HIGH);
+    //digitalWrite(PIN_MODEM_DTR, HIGH);
+}
+
+void SimComModem::initCoAP()
+{
+    echoAT("AT+CNACT=0,1");
+    delay(500);
+    echoAT("AT+CNACT?");
+    delay(100);
+    echoAT("AT+CCOAPINIT");
+}
+
+int SimComModem::sendPacket(const char* url, const char* path, const char* payload)
+{
+    SERIAL_MODEM.printf("AT+CCOAPURL=\"coap://%s\"\r\n", url);
+    delay(100);
+    SERIAL_MODEM.printf(
+        "AT+CCOAPPARA=?\"CODE\",1,uri-path,0,\"%s\",uri-query,0,\"address=1\",payload,0,\"%s\"\r\n", 
+        path, payload
+    );
+    delay(100);
+    sendAT("AT+CCOAPACTION");
+
+    return 1;
 }
 
 int SimComModem::available()

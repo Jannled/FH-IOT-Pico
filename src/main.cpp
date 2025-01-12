@@ -11,6 +11,9 @@
 #include <Arduino.h>
 #include <Wire.h>
 
+// URLs, Passwords etc.
+#include "secrets.h"
+
 #include "SimComModem.hpp"
 
 #ifdef ENABLE_COAP
@@ -60,16 +63,6 @@ SensorMessage sensorMessage;
 
 SimComModem modem;
 
-void sendATCommand(const char* command)
-{
-	SERIAL_MODEM.println(command);
-	String foo = SERIAL_MODEM.readStringUntil('\n');
-	Serial.print(command);
-	Serial.print(": ");
-	foo.trim();
-	Serial.println(foo);
-}
-
 void setup() 
 {
 	modem.init(115200);
@@ -88,30 +81,42 @@ void setup()
 	delay(2000);
 	modem.wakeup();
 
-	for(int i=0; i<5; i++)
+	Serial.println("Waiting for Modem to come Online");
+	for(int i=0; i<10; i++)
 	{
+		Serial.print(".");
 		SERIAL_MODEM.println("AT");
 		String foo = SERIAL_MODEM.readStringUntil('\n');
 		Serial.println(foo);
 	}
+	Serial.println();
 
 	SERIAL_MODEM.readString();
 	//modem.sleep();
 
-	sendATCommand("ATI");
+	modem.echoAT("ATI");
 	delay(500);	
-	sendATCommand("AT+GMI");
+	modem.echoAT("AT+GMI");
 	delay(500);
-	sendATCommand("AT+GSN");
+	modem.echoAT("AT+GSN");
 	delay(500);
-	sendATCommand("AT+CPIN?");
+	modem.echoAT("AT+CPIN?");
 	delay(500);
-	sendATCommand("AT+CFUN?");
+	modem.echoAT("AT+CFUN?");
 	delay(500);
-	sendATCommand("AT+CSCLK?");
+	modem.echoAT("AT+CSCLK?");
+	delay(500);
 
+	// CoAP
 	delay(500);
-
+	modem.initCoAP();
+	delay(500);
+	modem.sendPacket(
+		COAP_URL, 
+		"sensor/data", 
+		"Foo"
+	);
+	delay(1000);
 }
 
 unsigned long lastPublish = millis();
@@ -128,7 +133,7 @@ void loop()
 	if (now - lastPublish > 2500)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
-		SERIAL_MODEM.println("AT+CPSI?");
+		modem.sendAT("AT+CPSI?");
 		lastPublish = now;
 	}
 
