@@ -109,10 +109,8 @@ void setup()
 	modem.echoAT("AT+CEREG=1");
 	modem.echoAT("AT+CGNAPN");
 
-	Serial.println("Setting APN:");
-	modem.echoAT("AT+CNCFG=0,1,\"" APN "\"");
-
-	Serial.println("Checking if it worked:");
+	// Set IPv4
+	modem.echoAT("AT+CNCFG=0,1");
 	modem.echoAT("AT+CNCFG?");
 
 	// Init CoAP

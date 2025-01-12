@@ -89,7 +89,7 @@ void SimComModem::initCoAP()
 {
     echoAT("AT+CNACT=0,1");
     delay(500);
-    echoAT("AT+CNACT?");
+    echoAT("AT+CNACT?"); // Print IP Address
     delay(100);
     echoAT("AT+CCOAPINIT");
 }
@@ -105,7 +105,7 @@ int SimComModem::sendPacket(const char* url, const char* path, const uint8_t* da
     delay(500);
     flush();
 
-    SERIAL_MODEM.printf("AT+CCOAPPARA=\"CODE\",1,uri-path,0,\"sensor/data\",uri-query,0,\"address=1\",payload,1,\"");
+    SERIAL_MODEM.printf("AT+CCOAPPARA=\"CODE\",3,uri-path,0,\"sensor/data\",uri-query,0,\"address=1\",payload,1,\"");
     for(size_t i=0; i<len; i++)
         SERIAL_MODEM.printf("%02X", data[i]);
     SERIAL_MODEM.println("\"");
