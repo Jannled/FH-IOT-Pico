@@ -4,7 +4,7 @@
     "python.analysis.diagnosticSeverityOverrides": {
         "reportMissingModuleSource": "none"
     },
-    "python.terminal.activateEnvironment": false,
+    "python.terminal.activateEnvironment": true,
     "micropico.syncFolder": "",
     "micropico.openOnStart": true,
     "python.analysis.typeshedPaths": [
@@ -108,6 +108,7 @@
         "SNPING",
         "thethings",
         "venv",
+        "vodafone",
         "watchtowerr",
         "waveshare",
         "Waveshare",

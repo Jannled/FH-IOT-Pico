@@ -16,52 +16,20 @@
 
 #include "SimComModem.hpp"
 
-#ifdef ENABLE_COAP
-// Documentation: https://github.com/finitespace/BME280
-#include <BME280.h>
-#include <BME280I2C.h>
-
-// Documentation: https://github.com/hideakitai/MsgPack
-#include <MsgPack.h>
-
-// TODO implement IMEI parsing
-const uint32_t deviceID = 1337;
-
-// BME Sensor
-BME280I2C sensor;
-
-struct SensorMessage {
-	// The actual data
-	float temperature;
-	float humidity;
-	float pressure;
-	uint8_t rssi;
-	uint32_t senderID;
-
-	// Namen in Anlehnung an RFC 8428
-	MsgPack::str_t key_temp = "Cel";
-	MsgPack::str_t key_hum = "%RH";
-	MsgPack::str_t key_press = "Pa";
-	MsgPack::str_t key_id = "bn";
-	MsgPack::str_t key_rssi = "dB";
-
-	// Build the message
-	MSGPACK_DEFINE_MAP(
-		key_temp, temperature,
-		key_hum, humidity,
-		key_press, pressure,
-		key_rssi, rssi,
-		key_id, senderID
-	);
-};
-
-// MessagePack transport format
-MsgPack::Packer packer;
-SensorMessage sensorMessage;
-#endif // ENABLE_COAP
-
-
 SimComModem modem;
+
+const std::vector<char*> carriers = {"Telekom.de", "vodafone.de", "o2 - de"};
+
+void switchCarrier(const char* operatorName)
+{
+	SERIAL_MODEM.printf("AT+COPS=4,0,\"%s\"\r\n", operatorName); // Mode: 4 = Semi Automatic, Format: 0 = Long Operator
+
+	volatile int i=0;
+	while(SERIAL_MODEM.readString().length() < 1)
+	{
+		i++;
+	}
+}
 
 void setup() 
 {
@@ -69,15 +37,6 @@ void setup()
 	modem.powerOnSequence();
 
 	Serial.begin(115200); // USB UART
-	
-	// Init Temperature/Humidity Sensor
-	Wire.begin();
-	#ifdef ENABLE_COAP
-	sensor.begin();
-	#endif
-
-	modem.wakeup();
-
 	delay(2000);
 
 	Serial.println("Waiting for Modem to come Online");
@@ -106,76 +65,45 @@ void setup()
 	// Preferred Selection between CAT-M and NB-IoT
 	modem.echoAT("AT+CMNB=2");
 
-	modem.echoAT("AT+CEREG=1");
-	modem.echoAT("AT+CGNAPN");
-
-	// Set IPv4
-	modem.echoAT("AT+CNCFG=0,1");
-	modem.echoAT("AT+CNCFG?");
-
-	// Init CoAP
-	modem.flush();
-	modem.initCoAP();
-	modem.flush();
+	// Select the first operator
+	const char* opr = carriers[0];
+	Serial.printf("[%8lu] %s%s\r\n", millis(), "AT+COPS=", opr);
+	switchCarrier(opr);
 }
-
-unsigned long lastPublish = millis();
-unsigned long lastI2C = millis();
 
 void loop() 
 {
+	static unsigned long lastMeasurement = millis();
+	static unsigned long lastOperatorChange = millis();
+
+	static uint8_t opr_idx = 0;
+
 	// Make sure all data from Modem is printed
 	while(modem.available())
 		Serial.write((uint8_t) modem.read());
 
-	// Ask about RSSI and SNR
 	const unsigned long now = millis();
-	if (now - lastPublish > 2500)
+
+	// Switch Operators
+	if (now - lastOperatorChange > (30 * 1000))
+	{
+		const char* opr = carriers[opr_idx];
+		opr_idx = (opr_idx + 1) % carriers.size();
+
+		Serial.println();
+		Serial.println(" --------------------------------------------------------------");
+		Serial.println();
+
+		Serial.printf("[%8lu] %s%s\r\n", millis(), "AT+COPS=", opr);
+		switchCarrier(opr);
+		lastOperatorChange = now;
+	}
+
+	// Ask about RSSI and SNR
+	if (now - lastMeasurement > 2500)
 	{
 		Serial.printf("[%8lu] %s\r\n", millis(), "AT+CPSI?");
 		modem.sendAT("AT+CENG?");
-		lastPublish = now;
+		lastMeasurement = now;
 	}
-
-	// Trigger measurement and send packet
-	#ifdef ENABLE_COAP
-	if(now - lastI2C > 30000)
-	{
-		// Read BME280 Sensor
-		float temperature(NAN), humidity(NAN), pressure(NAN);
-		sensor.read(pressure, temperature, humidity);
-
-		// Build a JSON object
-		char buff[128] = {};
-		snprintf(
-			buff, sizeof(buff) - 1, 
-			"{\"temp\": %.2f, \"hum\": %.2f, \"press\": %.4f, \"bn\": %d}", 
-			temperature, humidity, pressure, deviceID
-		);
-		Serial.println(buff);
-
-		// Send JSON in plain text
-		modem.sendPacket(COAP_URL, "sensor/data", buff);
-		
-		// Build MessagePack
-		sensorMessage.temperature = temperature;
-		sensorMessage.humidity = humidity;
-		sensorMessage.pressure = pressure;
-		sensorMessage.senderID = deviceID;
-		packer.serialize(sensorMessage);
-
-		// Print MessagePack debug output
-		// Online Decoder: https://msgpack.solder.party/
-		for(size_t i=0; i<packer.size(); i++)
-			Serial.printf("%02X ", packer.data()[i]);
-		Serial.println();
-
-		//modem.sendPacket(COAP_URL, "sensor/data", packer.data(), packer.size());
-
-		// Clear the store, otherwise the next packet will be concatenated
-		packer.clear();
-
-		lastI2C = now;
-	}
-	#endif
 }
